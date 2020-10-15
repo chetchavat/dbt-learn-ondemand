@@ -3,19 +3,11 @@
 )}}
 
 with customers as (
-    select
-        id as customer_id,
-        first_name,
-        last_name
-    from raw.jaffle_shop.customers
+    select *
+    from {{ ref('stg_customers') }}
 ), orders as (
-    select
-        id as order_id,
-        user_id as customer_id,
-        order_date,
-        status
-
-    from raw.jaffle_shop.orders
+    select *
+    from {{ ref('stg_orders') }}
 ), customer_orders as (
     select
         customer_id,
@@ -24,6 +16,12 @@ with customers as (
         count(order_id) as number_of_orders
     from orders
     group by 1
+), order_gmv AS (
+    SELECT
+        customer_id
+        , SUM(amount) AS lifetime_value
+    FROM {{ ref('fct_orders') }}
+    GROUP BY customer_id
 ), final as (
     select
         customers.customer_id,
@@ -32,7 +30,9 @@ with customers as (
         customer_orders.first_order_date,
         customer_orders.most_recent_order_date,
         coalesce(customer_orders.number_of_orders, 0) as number_of_orders
+        , lifetime_value
     from customers
     left join customer_orders using (customer_id)
+    LEFT JOIN order_gmv USING(customer_id)
 )
 select * from final
